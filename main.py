@@ -3,18 +3,23 @@ import os
 import pandas as pd
 
 # -----------------------------
-# CONFIG (CLOUD FIX APPLIED)
+# CONFIG
 # -----------------------------
-BASE_DIR = "Data"  # ✅ FIX: use relative path for Streamlit Cloud
+BASE_DIR = "Data"
 
-st.set_page_config(page_title="Data Catalogue", layout="wide")
+st.set_page_config(
+    page_title="Data Catalogue Explorer",
+    page_icon="📊",
+    layout="wide"
+)
+
 st.title("📊 Data Catalogue Explorer")
 
 # -----------------------------
 # CHECK DIRECTORY
 # -----------------------------
 if not os.path.exists(BASE_DIR):
-    st.error("❌ Folder path does not exist. Please ensure 'Data' folder exists in your repository.")
+    st.error("❌ Folder path does not exist. Ensure 'Data' folder is in your repository.")
     st.stop()
 
 # -----------------------------
@@ -25,8 +30,13 @@ def list_files(folder):
     file_list = []
     for root, dirs, files in os.walk(folder):
         for f in files:
-            full_path = os.path.join(root, f)
-            file_list.append(full_path)
+
+            # ❌ Ignore Excel temp files
+            if f.startswith("~$"):
+                continue
+
+            file_list.append(os.path.join(root, f))
+
     return file_list
 
 
@@ -43,18 +53,22 @@ def read_file(file_path):
     ext = os.path.splitext(file_path)[1].lower()
 
     try:
+        # CSV
         if ext == ".csv":
             return pd.read_csv(file_path)
 
+        # Excel (FIX APPLIED)
         elif ext in [".xlsx", ".xls"]:
-            return pd.read_excel(file_path)
+            return pd.read_excel(file_path, engine="openpyxl")
 
+        # Text
         elif ext == ".txt":
             with open(file_path, "r", encoding="utf-8") as f:
                 return f.read()
 
         else:
             return None
+
     except Exception as e:
         return f"Error reading file: {e}"
 
@@ -65,7 +79,7 @@ def read_file(file_path):
 all_files = list_files(BASE_DIR)
 
 # -----------------------------
-# SIDEBAR - FILTERS
+# SIDEBAR FILTERS
 # -----------------------------
 st.sidebar.header("📁 Catalogue Filters")
 
