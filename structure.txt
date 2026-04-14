@@ -1,0 +1,43 @@
+Folder PATH listing
+Volume serial number is FC66-A0A0
+C:.
+|   structure.txt
+|   
+\---Data
+    +---Charging-Infra-Data
+    |   +---ops-Data
+    |   |       units-Data.xlsx
+    |   |       
+    |   \---Revenue-Data
+    |           Revenue-DPO.xlsx
+    |           
+    +---Charging-Infra-Expenses-Data
+    |       electricityBills.xlsx
+    |       StationRent.xlsx
+    |       
+    +---Emobility-Expenses-Data
+    +---HR-Data
+    |       employeesLeaves.xlsx
+    |       employeesManhours.xlsx
+    |       employeesTasks.xlsx
+    |       employeesWages.xlsx
+    |       
+    +---MG4s-Data
+    |   +---mg4sMileage
+    |   |       mg4sMileage.xlsx
+    |   |       
+    |   \---mg4sRevenue
+    |           hbt.py
+    |           hbtData.xlsx
+    |           revenueData.xlsx
+    |           
+    \---Nissan-Leafs
+        +---mileage
+        |       mileageData.csv
+        |       
+        +---revenue
+        |       revenueData.xlsx
+        |       
+        \---violations
+                violationsData.csv
+                
