@@ -3,9 +3,9 @@ import os
 import pandas as pd
 
 # -----------------------------
-# CONFIG
+# CONFIG (CLOUD FIX APPLIED)
 # -----------------------------
-BASE_DIR = r"C:\Users\Admin\OneDrive\Operational Intelligence Hub\Data"
+BASE_DIR = "Data"  # ✅ FIX: use relative path for Streamlit Cloud
 
 st.set_page_config(page_title="Data Catalogue", layout="wide")
 st.title("📊 Data Catalogue Explorer")
@@ -14,7 +14,7 @@ st.title("📊 Data Catalogue Explorer")
 # CHECK DIRECTORY
 # -----------------------------
 if not os.path.exists(BASE_DIR):
-    st.error("❌ Folder path does not exist. Please check BASE_DIR.")
+    st.error("❌ Folder path does not exist. Please ensure 'Data' folder exists in your repository.")
     st.stop()
 
 # -----------------------------
@@ -69,14 +69,15 @@ all_files = list_files(BASE_DIR)
 # -----------------------------
 st.sidebar.header("📁 Catalogue Filters")
 
-# Search box
 search_query = st.sidebar.text_input("🔍 Search file name")
 
-# File type filter
 file_types = sorted(list(set([os.path.splitext(f)[1].lower() for f in all_files])))
-selected_types = st.sidebar.multiselect("📂 File types", file_types, default=file_types)
+selected_types = st.sidebar.multiselect(
+    "📂 File types",
+    file_types,
+    default=file_types
+)
 
-# Filter files
 filtered_files = [
     f for f in all_files
     if (search_query.lower() in os.path.basename(f).lower())
@@ -85,21 +86,18 @@ filtered_files = [
 
 st.sidebar.write(f"📄 Total Files: {len(filtered_files)}")
 
-# Select file
 selected_file = st.sidebar.selectbox(
     "Select a file",
     filtered_files if filtered_files else ["No files found"]
 )
 
 # -----------------------------
-# MAIN PANEL
+# MAIN VIEW
 # -----------------------------
 if selected_file and selected_file != "No files found":
 
     st.subheader("📄 File Metadata")
-
-    info = file_info(selected_file)
-    st.json(info)
+    st.json(file_info(selected_file))
 
     st.subheader("👀 Preview")
 
