@@ -20,7 +20,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📊 Purview-Lite++")
+st.title("📊 Drivelectric Purview-Lite++")
 
 # =============================
 # LOGIN SYSTEM
