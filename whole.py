@@ -107,6 +107,9 @@ def auto_tag(file_name, columns):
 
 
 def load_file(file_path):
+    """
+    file_path is RELATIVE to BASE_DIR (NO 'Data/' prefix stored in DB)
+    """
     full_path = os.path.join(BASE_DIR, file_path)
     full_path = os.path.normpath(full_path)
 
@@ -179,7 +182,7 @@ def data_dictionary(df):
     ])
 
 # =============================
-# SCAN DATASET
+# SCAN DATASET (FIXED PATH LOGIC)
 # =============================
 def scan_folder():
     conn = sqlite3.connect(DB_PATH)
@@ -195,7 +198,10 @@ def scan_folder():
 
             try:
                 abs_path = os.path.join(root, f)
-                rel_path = os.path.relpath(abs_path, BASE_DIR).replace("\\", "/")
+
+                # IMPORTANT: store path RELATIVE to BASE_DIR ONLY
+                rel_path = os.path.relpath(abs_path, BASE_DIR)
+                rel_path = rel_path.replace("\\", "/")
 
                 size = round(os.path.getsize(abs_path) / 1024, 2)
 
@@ -210,8 +216,14 @@ def scan_folder():
 
                 conn.execute("""
                 INSERT INTO files VALUES (?, ?, ?, ?, ?, ?)
-                """, (f, rel_path, os.path.splitext(f)[1].lower(), size, tag,
-                      datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                """, (
+                    f,
+                    rel_path,
+                    os.path.splitext(f)[1].lower(),
+                    size,
+                    tag,
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                ))
 
                 if df is not None:
                     prof = data_quality(df)
@@ -247,7 +259,8 @@ def load_columns(file):
     conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query(
         "SELECT * FROM file_columns WHERE file_name=?",
-        conn, params=(file,)
+        conn,
+        params=(file,)
     )
     conn.close()
     return df
@@ -290,6 +303,7 @@ if query:
 # FILTERS
 # =============================
 st.sidebar.header("🏷 Tags")
+
 tags = df["tag"].dropna().unique().tolist()
 selected_tags = st.sidebar.multiselect("Filter Tags", tags, default=tags)
 
@@ -308,6 +322,7 @@ file = st.selectbox("Select file", df["file_name"])
 
 if file:
     rel_path = df[df["file_name"] == file]["file_path"].values[0]
+
     st.subheader("📌 Metadata")
     st.json(df[df["file_name"] == file].iloc[0].to_dict())
 
