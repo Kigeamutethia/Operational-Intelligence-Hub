@@ -6,7 +6,17 @@ import numpy as np
 from datetime import datetime
 
 import networkx as nx
-from pyvis.network import Network
+import plotly.express as px
+
+# =============================
+# OPTIONAL PYVIS (SAFE)
+# =============================
+try:
+    from pyvis.network import Network
+    PYVIS_AVAILABLE = True
+except:
+    PYVIS_AVAILABLE = False
+
 
 # =============================
 # CONFIG
@@ -15,12 +25,13 @@ BASE_DIR = os.path.join(os.getcwd(), "Data")
 DB_PATH = "metadata.db"
 
 st.set_page_config(
-    page_title="Drivelectric Enterprise Data Governance Platform",
+    page_title="Drivelectric Enterprise Data Platform",
     page_icon="📊",
     layout="wide"
 )
 
-st.title("📊 Drivelectric Purview-Lite++")
+st.title("📊 Drivelectric Enterprise Data Intelligence Platform")
+
 
 # =============================
 # LOGIN SYSTEM
@@ -49,6 +60,7 @@ if st.session_state["role"] is None:
     st.stop()
 
 role = st.session_state["role"]
+
 
 # =============================
 # INIT DB
@@ -90,10 +102,10 @@ def init_db():
 
 init_db()
 
+
 # =============================
 # HELPERS
 # =============================
-
 def auto_tag(file_name, columns):
     text = (file_name + " " + " ".join(columns)).lower()
 
@@ -107,14 +119,10 @@ def auto_tag(file_name, columns):
 
 
 def load_file(file_path):
-    """
-    file_path is RELATIVE to BASE_DIR (NO 'Data/' prefix stored in DB)
-    """
     full_path = os.path.join(BASE_DIR, file_path)
     full_path = os.path.normpath(full_path)
 
     if not os.path.exists(full_path):
-        st.error(f"File not found: {full_path}")
         return None
 
     try:
@@ -124,14 +132,12 @@ def load_file(file_path):
             return pd.read_csv(full_path, low_memory=False)
         elif ext in [".xlsx", ".xls"]:
             return pd.read_excel(full_path, engine="openpyxl")
-    except Exception as e:
-        st.error(f"Error loading file {full_path}: {e}")
+    except:
+        return None
 
     return None
 
-# =============================
-# DATA QUALITY
-# =============================
+
 def data_quality(df):
     return {
         col: {
@@ -141,9 +147,7 @@ def data_quality(df):
         for col in df.columns
     }
 
-# =============================
-# OUTLIERS
-# =============================
+
 def detect_outliers(df):
     results = {}
     nums = df.select_dtypes(include=np.number)
@@ -166,9 +170,7 @@ def detect_outliers(df):
 
     return results
 
-# =============================
-# DATA DICTIONARY
-# =============================
+
 def data_dictionary(df):
     return pd.DataFrame([
         {
@@ -181,12 +183,12 @@ def data_dictionary(df):
         for c in df.columns
     ])
 
+
 # =============================
-# SCAN DATASET (FIXED PATH LOGIC)
+# SCAN FOLDER
 # =============================
 def scan_folder():
     conn = sqlite3.connect(DB_PATH)
-
     conn.execute("DELETE FROM files")
     conn.execute("DELETE FROM file_columns")
 
@@ -198,21 +200,14 @@ def scan_folder():
 
             try:
                 abs_path = os.path.join(root, f)
-
-                # IMPORTANT: store path RELATIVE to BASE_DIR ONLY
-                rel_path = os.path.relpath(abs_path, BASE_DIR)
-                rel_path = rel_path.replace("\\", "/")
+                rel_path = os.path.relpath(abs_path, BASE_DIR).replace("\\", "/")
 
                 size = round(os.path.getsize(abs_path) / 1024, 2)
 
-                df = None
-                try:
-                    df = load_file(rel_path)
-                except:
-                    pass
+                df = load_file(rel_path)
+                cols = list(df.columns) if df is not None else []
 
-                columns = list(df.columns) if df is not None else []
-                tag = auto_tag(f, columns)
+                tag = auto_tag(f, cols)
 
                 conn.execute("""
                 INSERT INTO files VALUES (?, ?, ?, ?, ?, ?)
@@ -239,11 +234,12 @@ def scan_folder():
                             prof[col]["unique"]
                         ))
 
-            except Exception as e:
-                st.warning(f"Failed processing {f}: {e}")
+            except:
+                pass
 
     conn.commit()
     conn.close()
+
 
 # =============================
 # LOAD DATA
@@ -255,18 +251,8 @@ def load_files():
     return df
 
 
-def load_columns(file):
-    conn = sqlite3.connect(DB_PATH)
-    df = pd.read_sql_query(
-        "SELECT * FROM file_columns WHERE file_name=?",
-        conn,
-        params=(file,)
-    )
-    conn.close()
-    return df
-
 # =============================
-# UI CONTROLS
+# SIDEBAR CONTROLS
 # =============================
 st.sidebar.header("⚙️ Controls")
 
@@ -287,27 +273,29 @@ if role == "admin":
 df = load_files()
 
 if df.empty:
-    st.warning("No metadata found. Build catalogue first.")
+    st.warning("No data found. Build catalogue first.")
     st.stop()
 
-# =============================
-# SEARCH
-# =============================
-st.sidebar.header("🔍 Search")
-query = st.sidebar.text_input("Search")
-
-if query:
-    df = df[df["file_name"].str.contains(query, case=False, na=False)]
 
 # =============================
-# FILTERS
+# FILTERS (POWER BI STYLE)
 # =============================
-st.sidebar.header("🏷 Tags")
+st.sidebar.header("🎛 Filters")
 
-tags = df["tag"].dropna().unique().tolist()
-selected_tags = st.sidebar.multiselect("Filter Tags", tags, default=tags)
+tag_filter = st.sidebar.multiselect(
+    "Tags",
+    df["tag"].unique().tolist(),
+    default=df["tag"].unique().tolist()
+)
 
-df = df[df["tag"].isin(selected_tags)]
+type_filter = st.sidebar.multiselect(
+    "File Type",
+    df["extension"].unique().tolist(),
+    default=df["extension"].unique().tolist()
+)
+
+df = df[(df["tag"].isin(tag_filter)) & (df["extension"].isin(type_filter))]
+
 
 # =============================
 # MAIN TABLE
@@ -315,8 +303,9 @@ df = df[df["tag"].isin(selected_tags)]
 st.subheader("📁 Data Catalogue")
 st.dataframe(df, use_container_width=True)
 
+
 # =============================
-# FILE EXPLORER
+# FILE DETAIL VIEW
 # =============================
 file = st.selectbox("Select file", df["file_name"])
 
@@ -335,52 +324,128 @@ if file:
         st.subheader("🧪 Data Quality")
         st.json(data_quality(df_file))
 
-        st.subheader("🧪 Outliers")
+        st.subheader("⚠️ Outliers")
         st.json(detect_outliers(df_file))
 
         st.subheader("👀 Preview")
         st.dataframe(df_file)
 
+
 # =============================
-# KPI DASHBOARD
+# 🏢 ENTERPRISE DASHBOARD
 # =============================
-st.subheader("📈 KPI Dashboard")
+st.subheader("🏢 Executive Intelligence Dashboard")
 
 conn = sqlite3.connect(DB_PATH)
 files_df = pd.read_sql_query("SELECT * FROM files", conn)
 cols_df = pd.read_sql_query("SELECT * FROM file_columns", conn)
 conn.close()
 
-st.metric("Total Files", len(files_df))
-st.metric("Total Columns", len(cols_df))
-st.metric("Tags", files_df["tag"].nunique())
+
+# KPI ROW
+c1, c2, c3, c4 = st.columns(4)
+
+c1.metric("Files", len(files_df))
+c2.metric("Columns", len(cols_df))
+c3.metric("Tags", files_df["tag"].nunique())
+c4.metric("Avg Size KB", round(files_df["size_kb"].mean(), 2))
+
+
+st.divider()
+
+
+# =============================
+# TREND
+# =============================
+files_df["scanned_at"] = pd.to_datetime(files_df["scanned_at"])
+
+trend = files_df.groupby(files_df["scanned_at"].dt.date).size().reset_index(name="count")
+
+fig1 = px.line(trend, x="scanned_at", y="count", markers=True, title="Ingestion Trend")
+st.plotly_chart(fig1, use_container_width=True)
+
+st.divider()
+
+
+# =============================
+# TAG DISTRIBUTION
+# =============================
+fig2 = px.bar(files_df["tag"].value_counts().reset_index(),
+              x="tag", y="count", title="Data Classification Tags")
+
+st.plotly_chart(fig2, use_container_width=True)
+
+
+# =============================
+# DATA QUALITY VIEW
+# =============================
+if not cols_df.empty:
+    q = cols_df.groupby("file_name").agg(
+        missing=("missing_pct", "mean"),
+        unique=("unique_count", "mean")
+    ).reset_index()
+
+    fig3 = px.scatter(q, x="unique", y="missing",
+                      size="missing",
+                      color="file_name",
+                      title="Data Quality Heatmap")
+
+    st.plotly_chart(fig3, use_container_width=True)
+
+
+# =============================
+# EXECUTIVE INSIGHTS
+# =============================
+st.subheader("🧾 Executive Insights")
+
+avg_missing = cols_df["missing_pct"].mean() if not cols_df.empty else 0
+
+if avg_missing < 10:
+    st.success("🟢 Data ecosystem is healthy")
+elif avg_missing < 25:
+    st.warning("🟠 Moderate data quality issues detected")
+else:
+    st.error("🔴 Critical data quality issues detected")
+
+largest = files_df.sort_values("size_kb", ascending=False).head(1)
+
+if not largest.empty:
+    st.info(f"📦 Largest dataset: {largest.iloc[0]['file_name']}")
+
 
 # =============================
 # LINEAGE GRAPH
 # =============================
-st.subheader("🌐 Lineage Graph")
+st.subheader("🌐 Data Lineage")
 
 conn = sqlite3.connect(DB_PATH)
 lineage = pd.read_sql_query("SELECT * FROM lineage", conn)
 conn.close()
 
 if not lineage.empty:
-    G = nx.DiGraph()
 
-    for _, r in lineage.iterrows():
-        G.add_edge(r["source_file"], r["output"])
+    if PYVIS_AVAILABLE:
+        G = nx.DiGraph()
 
-    net = Network(height="500px", width="100%", directed=True)
+        for _, r in lineage.iterrows():
+            G.add_edge(r["source_file"], r["output"])
 
-    for node in G.nodes:
-        net.add_node(node, label=node)
+        net = Network(height="500px", width="100%", directed=True)
 
-    for edge in G.edges:
-        net.add_edge(edge[0], edge[1])
+        for n in G.nodes:
+            net.add_node(n, label=n)
 
-    net.save_graph("graph.html")
+        for e in G.edges:
+            net.add_edge(e[0], e[1])
 
-    st.components.v1.html(open("graph.html").read(), height=500)
+        st.components.v1.html(net.generate_html(), height=500)
+
+    else:
+        st.graphviz_chart(
+            "digraph { " +
+            " ".join([f'"{r.source_file}" -> "{r.output}"' for _, r in lineage.iterrows()]) +
+            " }"
+        )
 
 else:
-    st.info("No lineage data yet.")
+    st.info("No lineage data available.")
