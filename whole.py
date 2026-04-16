@@ -11,7 +11,7 @@ from pyvis.network import Network
 # =============================
 # CONFIG
 # =============================
-BASE_DIR = "Data"
+BASE_DIR = os.path.join(os.getcwd(), "Data")
 DB_PATH = "metadata.db"
 
 st.set_page_config(
@@ -93,6 +93,7 @@ init_db()
 # =============================
 # HELPERS
 # =============================
+
 def auto_tag(file_name, columns):
     text = (file_name + " " + " ".join(columns)).lower()
 
@@ -106,14 +107,24 @@ def auto_tag(file_name, columns):
 
 
 def load_file(file_path):
-    ext = os.path.splitext(file_path)[1].lower()
+    full_path = os.path.join(BASE_DIR, file_path)
+    full_path = os.path.normpath(full_path)
 
-    if ext == ".csv":
-        return pd.read_csv(file_path, low_memory=False)
-    elif ext in [".xlsx", ".xls"]:
-        return pd.read_excel(file_path, engine="openpyxl")
+    if not os.path.exists(full_path):
+        st.error(f"File not found: {full_path}")
+        return None
+
+    try:
+        ext = os.path.splitext(full_path)[1].lower()
+
+        if ext == ".csv":
+            return pd.read_csv(full_path, low_memory=False)
+        elif ext in [".xlsx", ".xls"]:
+            return pd.read_excel(full_path, engine="openpyxl")
+    except Exception as e:
+        st.error(f"Error loading file {full_path}: {e}")
+
     return None
-
 
 # =============================
 # DATA QUALITY
@@ -126,7 +137,6 @@ def data_quality(df):
         }
         for col in df.columns
     }
-
 
 # =============================
 # OUTLIERS
@@ -146,13 +156,12 @@ def detect_outliers(df):
         outliers = nums[(nums[col] < lower) | (nums[col] > upper)]
 
         results[col] = {
-            "outliers": len(outliers),
+            "outliers": int(len(outliers)),
             "lower": float(lower),
             "upper": float(upper)
         }
 
     return results
-
 
 # =============================
 # DATA DICTIONARY
@@ -169,7 +178,6 @@ def data_dictionary(df):
         for c in df.columns
     ])
 
-
 # =============================
 # SCAN DATASET
 # =============================
@@ -185,19 +193,24 @@ def scan_folder():
             if f.startswith("~$"):
                 continue
 
-            path = os.path.join(root, f)
-            ext = os.path.splitext(f)[1].lower()
-
             try:
-                size = round(os.path.getsize(path) / 1024, 2)
-                df = load_file(path)
+                abs_path = os.path.join(root, f)
+                rel_path = os.path.relpath(abs_path, BASE_DIR).replace("\\", "/")
+
+                size = round(os.path.getsize(abs_path) / 1024, 2)
+
+                df = None
+                try:
+                    df = load_file(rel_path)
+                except:
+                    pass
 
                 columns = list(df.columns) if df is not None else []
                 tag = auto_tag(f, columns)
 
                 conn.execute("""
                 INSERT INTO files VALUES (?, ?, ?, ?, ?, ?)
-                """, (f, path, ext, size, tag,
+                """, (f, rel_path, os.path.splitext(f)[1].lower(), size, tag,
                       datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
                 if df is not None:
@@ -214,12 +227,11 @@ def scan_folder():
                             prof[col]["unique"]
                         ))
 
-            except:
-                continue
+            except Exception as e:
+                st.warning(f"Failed processing {f}: {e}")
 
     conn.commit()
     conn.close()
-
 
 # =============================
 # LOAD DATA
@@ -240,7 +252,6 @@ def load_columns(file):
     conn.close()
     return df
 
-
 # =============================
 # UI CONTROLS
 # =============================
@@ -250,6 +261,15 @@ if role == "admin":
     if st.sidebar.button("🔄 Build Catalogue"):
         scan_folder()
         st.success("Catalogue updated!")
+
+    if st.sidebar.button("⚠️ Reset DB"):
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute("DELETE FROM files")
+        conn.execute("DELETE FROM file_columns")
+        conn.commit()
+        conn.close()
+        st.warning("DB reset")
+
 
 df = load_files()
 
@@ -261,7 +281,6 @@ if df.empty:
 # SEARCH
 # =============================
 st.sidebar.header("🔍 Search")
-
 query = st.sidebar.text_input("Search")
 
 if query:
@@ -271,7 +290,6 @@ if query:
 # FILTERS
 # =============================
 st.sidebar.header("🏷 Tags")
-
 tags = df["tag"].dropna().unique().tolist()
 selected_tags = st.sidebar.multiselect("Filter Tags", tags, default=tags)
 
@@ -289,16 +307,13 @@ st.dataframe(df, use_container_width=True)
 file = st.selectbox("Select file", df["file_name"])
 
 if file:
-
-    path = df[df["file_name"] == file]["file_path"].values[0]
-
+    rel_path = df[df["file_name"] == file]["file_path"].values[0]
     st.subheader("📌 Metadata")
     st.json(df[df["file_name"] == file].iloc[0].to_dict())
 
-    df_file = load_file(path)
+    df_file = load_file(rel_path)
 
     if df_file is not None:
-
         st.subheader("🧾 Data Dictionary")
         st.dataframe(data_dictionary(df_file))
 
