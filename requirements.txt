@@ -4,7 +4,4 @@ openpyxl
 networkx
 pyvis
 plotly
-datetime
-sqlite3
-plotly
 requests
