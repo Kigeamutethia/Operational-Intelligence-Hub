@@ -1136,3 +1136,40 @@ Traceback (most recent call last):
            ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 UnicodeEncodeError: 'charmap' codec can't encode character '\u2705' in position 2: character maps to <undefined>
 Completed at 28/04/2026 18:59:28.05 
+============================== 
+Running jobs at 29/04/2026 15:48:51.20 
+C:\Users\Admin\OneDrive\Operational Intelligence Hub\code\MileageConcats.py:10: DtypeWarning: Columns (2) have mixed types. Specify dtype option on import or set low_memory=False.
+  leaf = pd.read_csv(leaf_path)
+         Date   CAR REG  Mileage  Violations Vehicle_Type
+0  01/01/2024  KCZ 560G    318.0        10.0  Nissan Leaf
+1  01/01/2024  KCY 492D      0.0         0.0  Nissan Leaf
+2  01/01/2024  KDC 978N    230.0         0.0  Nissan Leaf
+3  01/01/2024  KDM 325H    158.0        18.0  Nissan Leaf
+4  01/01/2024  KDC 513X    110.0         7.0  Nissan Leaf
+Working directory: C:\Users\Admin\OneDrive\Operational Intelligence Hub\code
+
+--- Sample Cleaned VRNs ---
+          VRN   Vehicle
+0    KDU 588U  KDU 588U
+1    KDW477C   KDW 477C
+2           -         -
+6   KCU 563U   KCU 563U
+10   KCY 489g  KCY 489G
+12    KDE064U  KDE 064U
+14    KDC950V  KDC 950V
+15    KDH925J  KDH 925J
+16    KDW483C  KDW 483C
+19   KDH 915Q  KDH 915Q
+
+--- Invalid VRNs ---
+  VRN Vehicle
+2   -       -
+Traceback (most recent call last):
+  File "C:\Users\Admin\OneDrive\Operational Intelligence Hub\code\CleanedEcharge.py", line 89, in <module>
+    print("\n\u2705 Charging data processing complete!")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python313\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2705' in position 2: character maps to <undefined>
+Completed at 29/04/2026 15:49:17.25 
